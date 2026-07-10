@@ -8,63 +8,63 @@ module icache_micro_cache #(
   parameter NR_MINIONS    = 8,
   parameter NR_MINIONS_L  = (NR_MINIONS == 1) ? 1 : $clog2(NR_MINIONS)
 ) (
-  // System signals
-  input  logic                                     clock,
-  input  logic                                     reset,
-  // ESRs
-  input  icache_prefetch_conf_t                    esr_prefetch_conf,
-  input  logic                                     esr_prefetch_start,
-  output logic                                     esr_prefetch_done,
-  input  esr_mprot_t                               esr_mprot,
-  input  tlb_entry_type                            esr_vmspagesize,
-  input  logic                                     esr_bypass_icache,
-  input  logic                                     esr_shire_coop_mode,
-  // Request port
-  output logic                                     f0_req_ready,
-  input  logic                                     f0_req_valid,
-  input  frontend_icache_req                       f0_req,
-  input  logic [NR_MINIONS_L-1:0]                  f0_req_min_id,
-  // Response
-  output logic                                     f4_resp_valid,
-  output logic                                     f4_resp_miss,
-  output icache_frontend_resp                      f4_resp,
-  output logic                                     f5_resp_fill_done,
-  // Flush control
-  input  logic                                     f0_flush_data,
-  // Request to L1 tag array
-  input  logic                                     f0_l1_miss_req_ready,
-  output logic                                     f0_l1_miss_req_valid,
-  output logic [`PA_RANGE]                         f0_l1_miss_req_addr,
-  // Response from L1
-  input  logic                                     f0_l1_miss_resp_early_valid,
-  input  logic                                     f0_l1_miss_resp_valid,
-  input  logic [`ICACHE_BLOCK_BITS-1:0]            f0_l1_miss_resp_data,
-  input  logic                                     f0_l1_miss_resp_ecc_err,
-  input  logic                                     f0_l1_miss_resp_l2_err,
-  // TLB/PTW control
-  input  minion_satp_info [NR_MINIONS-1:0]         satp_info,
-  input  minion_satp_info [NR_MINIONS-1:0]         matp_info,
-  input  logic [NR_MINIONS-1:0]                    tlb_invalidate,
-  // PTW request
-  output minion_ptw_req                            ptw_req_data,
-  output logic                                     ptw_req_valid,
-  input  logic                                     ptw_req_ready,
-  output logic                                     ptw_invalidate,
-  // PTW response
-  input  logic                                     ptw_resp_valid,
-  input  minion_ptw_pte                            ptw_resp_data,
-  // APB access
-  input  logic [`ICACHE_DBG_UCACHE_ADDR_WIDTH-1:0] apb_paddr,
-  input  logic                                     apb_pwrite,
-  input  logic                                     apb_psel,
-  input  logic                                     apb_penable,
-  input  logic [`bpam_shire_apb_data_width-1:0]    apb_pwdata,
-  output logic                                     apb_pready,
-  output logic [`bpam_shire_apb_data_width-1:0]    apb_prdata,
-  output logic                                     apb_pslverr,
-  // Output debug signals going to Status Monitor
-  output icache_dbg_sm_t                           dbg_sm_signals
-  );
+  // -------------------------  System signals  ---------------------------------------------------------
+  input     logic                                     clock,      //    
+  input     logic                                     reset,      // 
+  // -------------------------  ESRs  -------------------------------------------------------------------
+  input     icache_prefetch_conf_t                    esr_prefetch_conf  ,           //  Prefetch lines configuration(VA, PRV, NUM_LINES)
+  input     logic                                     esr_prefetch_start ,           //  Prefetch start signal
+  output    logic                                     esr_prefetch_done  ,           //  
+  input     esr_mprot_t                               esr_mprot          ,           //  
+  input     tlb_entry_type                            esr_vmspagesize    ,           //  
+  input     logic                                     esr_bypass_icache  ,           //  
+  input     logic                                     esr_shire_coop_mode,           //  
+  // -------------------------  Request port  -----------------------------------------------------------
+  output    logic                                     f0_req_ready ,                 //  
+  input     logic                                     f0_req_valid ,                 //  
+  input     frontend_icache_req                       f0_req       ,                 //  
+  input     logic [NR_MINIONS_L-1:0]                  f0_req_min_id,                 //  
+  // -------------------------  Response  ---------------------------------------------------------------
+  output    logic                                     f4_resp_valid    ,             //  
+  output    logic                                     f4_resp_miss     ,             //  
+  output    icache_frontend_resp                      f4_resp          ,             //  
+  output    logic                                     f5_resp_fill_done,             //  
+  // ------------------------  Flush control  -----------------------------------------------------------
+  input     logic                                     f0_flush_data,                 //  
+  // -------------------  Request to L1 tag array  ------------------------------------------------------
+  input     logic                                     f0_l1_miss_req_ready,          //  
+  output    logic                                     f0_l1_miss_req_valid,          //  
+  output    logic                 [`PA_RANGE]         f0_l1_miss_req_addr ,          //  
+  // ----------------------  Response from L1  ----------------------------------------------------------
+  input     logic                                     f0_l1_miss_resp_early_valid,   //  
+  input     logic                                     f0_l1_miss_resp_valid      ,   //  
+  input     logic    [`ICACHE_BLOCK_BITS-1:0]         f0_l1_miss_resp_data       ,   //  
+  input     logic                                     f0_l1_miss_resp_ecc_err    ,   //  
+  input     logic                                     f0_l1_miss_resp_l2_err     ,   //  
+  // ----------------------  TLB/PTW control  -----------------------------------------------------------
+  input     minion_satp_info [NR_MINIONS-1:0]         satp_info     ,                //  
+  input     minion_satp_info [NR_MINIONS-1:0]         matp_info     ,                //  
+  input     logic            [NR_MINIONS-1:0]         tlb_invalidate,                //  
+  // -----------------------  PTW request  --------------------------------------------------------------
+  output    minion_ptw_req                            ptw_req_data  ,                //  
+  output    logic                                     ptw_req_valid ,                //  
+  input     logic                                     ptw_req_ready ,                //  
+  output    logic                                     ptw_invalidate,                //  
+  // -----------------------  PTW response  -------------------------------------------------------------
+  input     logic                                     ptw_resp_valid,                //  
+  input     minion_ptw_pte                            ptw_resp_data ,                //  
+  // -----------------------  APB access  ---------------------------------------------------------------
+  input     logic [`ICACHE_DBG_UCACHE_ADDR_WIDTH-1:0] apb_paddr  ,                   //  
+  input     logic                                     apb_pwrite ,                   //  
+  input     logic                                     apb_psel   ,                   //  
+  input     logic                                     apb_penable,                   //  
+  input     logic [`bpam_shire_apb_data_width-1:0]    apb_pwdata ,                   //  
+  output    logic                                     apb_pready ,                   //  
+  output    logic [`bpam_shire_apb_data_width-1:0]    apb_prdata ,                   //  
+  output    logic                                     apb_pslverr,                   //  
+  // ---------  Output debug signals going to Status Monitor  --------------------------------------------
+  output    icache_dbg_sm_t                           dbg_sm_signals                 //  
+);
 
   // INTERNAL DECLARATIONS
   logic                                    f1_bypass_icache;
@@ -501,12 +501,12 @@ module icache_micro_cache #(
   // //////////////////////////////////////////////////////////////////////////////
   frontend_icache_req f1_req;
 
-  // CLK    RST    EN                 DOUT              DIN                DEF
-  `RST_FF(clock, reset,                    f1_valid,         f0_req_pipe_valid, 1'b0)
-  `EN_FF (clock,        f0_req_pipe_valid, f1_min_id,        f0_req_min_id_pipe)
-  `EN_FF (clock,        f0_req_pipe_valid, f1_req,           f0_req_pipe)
-  `EN_FF (clock,        f0_req_pipe_valid, f1_bypass_icache, esr_bypass_icache)
-  `EN_FF (clock,        f0_req_pipe_valid, f1_is_prefetch,   f0_prefetch_req_access)
+  //       CLK    RST          EN                  DOUT               DIN                DEF
+  `RST_FF(clock, reset,                      f1_valid        ,  f0_req_pipe_valid     , 1'b0)
+  `EN_FF (clock,        f0_req_pipe_valid,   f1_min_id       ,  f0_req_min_id_pipe          )
+  `EN_FF (clock,        f0_req_pipe_valid,   f1_req          ,  f0_req_pipe                 )
+  `EN_FF (clock,        f0_req_pipe_valid,   f1_bypass_icache,  esr_bypass_icache           )
+  `EN_FF (clock,        f0_req_pipe_valid,   f1_is_prefetch  ,  f0_prefetch_req_access      )
 
   // //////////////////////////////////////////////////////////////////////////////
   // TLB that converts addresses from virtual to physical
@@ -515,9 +515,9 @@ module icache_micro_cache #(
 
   // Generate TLB request
   assign f1_tlb_req_data = '{ status      : f1_req.vm_status,
-                            vpn         : f1_req.addr[`VA_TRANS_RANGE],
-                            passthrough : 1'b0,
-                            msb_err     : f1_req.addr[`VA_EXT_MSB] ^ f1_req.addr[`VA_MSB]
+                              vpn         : f1_req.addr[`VA_TRANS_RANGE],
+                              passthrough : 1'b0,
+                              msb_err     : f1_req.addr[`VA_EXT_MSB] ^ f1_req.addr[`VA_MSB]
   };
 
   // Instantiate TLB shared among all the minions
