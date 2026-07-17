@@ -522,8 +522,8 @@ module icache_micro_cache #(
 
   // Instantiate TLB shared among all the minions
   icache_tlb_array #(
-    .ENTRIES             ( `ICACHE_TLB_ENTRIES ),
-    .NR_MINIONS          ( NR_MINIONS          )
+    .ENTRIES             ( `ICACHE_TLB_ENTRIES ),    // 16
+    .NR_MINIONS          ( NR_MINIONS          )     // 4
   ) tlb_array (
     // System signals
     .clock               ( clock               ),
@@ -536,16 +536,16 @@ module icache_micro_cache #(
     .req_data            ( f1_tlb_req_data     ),
     .req_valid           ( f1_valid            ),
     // Response with the physical bits
-    .resp_data           ( f1_tlb_resp_data    ),
+    .resp_data           ( f1_tlb_resp_data    ),      // TLB Output response
     // TLB/PTW control
     .satp_info           ( satp_info           ),
     .matp_info           ( matp_info           ),
     .tlb_invalidate      ( tlb_invalidate      ),
     // PTW request
-    .ptw_req_data        ( ptw_req_data        ),
-    .ptw_req_valid       ( ptw_req_valid       ),
-    .ptw_req_ready       ( ptw_req_ready       ),
-    .ptw_invalidate      ( ptw_invalidate      ),
+    .ptw_req_data        ( ptw_req_data        ),      // PTW request data from TLB
+    .ptw_req_valid       ( ptw_req_valid       ),      // PTW request valid 
+    .ptw_req_ready       ( ptw_req_ready       ),      // Input PTW request ready
+    .ptw_invalidate      ( ptw_invalidate      ),      // PTW invaldiate (Reduction OR of TLB_INVALIDATE)
     // PTW response
     .ptw_resp_valid      ( ptw_resp_valid      ),
     .ptw_resp_data       ( ptw_resp_data       )

@@ -46,7 +46,7 @@ localparam TAG_SZ                   = `VA_TRANS_SIZE - TLB_CACHE_IDX_SZ_PER_MIN;
 function automatic logic [TAG_SZ-1:0] tlb_tag(logic [`VA_TRANS_RANGE] vpn, tlb_entry_type typ,
                                               logic coop_mode);
   if (coop_mode) begin
-    // In cooperative mode, the whole cache is shared amond all the minions
+    // In cooperative mode, the whole cache is shared among all the minions
     case (typ)
       tlb_entry_type_2M: tlb_tag = TAG_SZ'({vpn[`VA_TRANS_MSB : (`VA_UNTRANS_SIZE + `PTW_PG_IDX_SZ + TLB_CACHE_IDX_SZ)],
                                             (`PTW_PG_IDX_SZ)'(1'b0)});

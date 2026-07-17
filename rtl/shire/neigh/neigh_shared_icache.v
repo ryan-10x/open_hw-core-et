@@ -74,7 +74,7 @@ module neigh_shared_icache #(
   output logic                                    apb_pslverr,
   // Output debug signals going to Status Monitor
   output icache_dbg_sm_t                          dbg_sm_signals
-  );
+);
 
   localparam NR_MIN_PER_REQ       = NR_MINIONS/NR_REQUESTORS;
   localparam NR_THREADS_PER_REQ   = NR_MINIONS*`CORE_NR_THREADS/NR_REQUESTORS;
@@ -103,7 +103,7 @@ module neigh_shared_icache #(
       logic f0_thread_req_valid;
       assign f0_thread_req_valid = (f0_req[i].thread_id == t[`CORE_NR_THREADS_R]) && f0_req_valid[i];
 
-      // CLK    RST    EN                                         DOUT                DIN                      DEF
+      //       CLK    RST    EN                                         DOUT                DIN                      DEF
       `RST_FF (clock, reset,                                            f1_req_valid[i][t], f1_req_valid_next[i][t], 1'b0)
       `EN_FF  (clock,        f0_thread_req_valid & ~f1_req_valid[i][t], f1_req[i][t],       f0_req[i])
 
@@ -190,7 +190,7 @@ module neigh_shared_icache #(
     for (genvar t = 0; t < NR_THREADS_PER_REQ; t++) begin: TH_MISS_CNT
       logic [4:0] th_miss_cnt_next;
 
-      // CLK    RST    EN                 DOUT            DIN               DEF
+      //         CLK    RST    EN                 DOUT            DIN               DEF
       `RST_EN_FF(clock, reset, th_miss_cnt_en[t], th_miss_cnt[t], th_miss_cnt_next, '0)
 
       assign th_miss_cnt_sat[t] = th_miss_cnt[t] == '1;
@@ -201,15 +201,15 @@ module neigh_shared_icache #(
 
         // Counter is reset if this thread hits or on error
         if (~f4_resp_miss[i] | f4_resp_err)
-        th_miss_cnt_next = '0;
+            th_miss_cnt_next = '0;
         // Otherwise increment counter if it is not saturated
         else if (~th_miss_cnt_sat[t])
-        th_miss_cnt_next = th_miss_cnt_next + 1'b1;
+            th_miss_cnt_next = th_miss_cnt_next + 1'b1;
       end
-    end
+    end : TH_MISS_CNT
 
     // If any counters saturates, mask threads from other minions until those ones hit
-    // CLK    RST    EN               DOUT             DIN                DEF
+    //         CLK    RST    EN               DOUT             DIN                DEF
     `RST_FF   (clock, reset,                  th_miss_mask_en, |th_miss_cnt_en,   1'b0)
     `RST_EN_FF(clock, reset, th_miss_mask_en, th_miss_mask,    th_miss_mask_next, '1)
 
@@ -228,7 +228,7 @@ module neigh_shared_icache #(
       else
       th_miss_mask_next = '1;
     end
-  end
+  end : REQ_ARB
   
 
   // //////////////////////////////////////////////////////////////////////////////

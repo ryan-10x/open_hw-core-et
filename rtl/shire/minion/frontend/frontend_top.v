@@ -137,7 +137,7 @@ module frontend_top (
       .debug_ffb_exec       ( debug_ffb_exec[thread]          ),
       .io_halt              ( halt[thread]                    )
     );
-  end
+  end : FRONTEND_THREAD
 
 ////////////////////////////////////////////////////////////////////////////////
 // Arbiter that selects which is the next thread within the minion that gets
@@ -151,7 +151,7 @@ module frontend_top (
     `EN_FF     (clock,        f1_icache_req_ready_arb & f0_icache_req_valid_arb[0], f1_icache_req,         f0_icache_req_arb[0])
     `RST_EN_FF (clock, reset, f1_icache_req_ready_arb,                              f1_icache_req_valid,   f0_icache_req_valid_arb[0], 1'b0)
   end
-  endgenerate
+  endgenerate : FRONTEND_ICACHE_ARB_DIS
 
   generate if(`CORE_NR_THREADS > 1) begin : FRONTEND_ICACHE_ARB
     frontend_icache_req f0_icache_req_winner;
@@ -179,7 +179,7 @@ module frontend_top (
     `EN_FF     (clock,        f1_icache_req_ready_arb & |f0_icache_req_valid_arb, f1_icache_req,       f0_icache_req_winner)
     `RST_EN_FF (clock, reset, f1_icache_req_ready_arb,                            f1_icache_req_valid, |f0_icache_req_valid_arb, 1'b0)
   end
-  endgenerate
+  endgenerate : FRONTEND_ICACHE_ARB
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -254,7 +254,7 @@ module frontend_top (
       f7_arb_inst_data = f7_core_inst_data[f7_exp_thread_id];
     end
   end
-  endgenerate
+  endgenerate : FRONTEND_EXP_ARB_DIS
 
   generate if(`CORE_NR_THREADS > 1) begin : FRONTEND_EXP_ARB
     always_comb begin
@@ -269,7 +269,7 @@ module frontend_top (
       f7_arb_inst_data = f7_core_inst_data[f7_exp_thread_id];
     end // always_comb
   end
-  endgenerate
+  endgenerate : FRONTEND_EXP_ARB
 
 
   ////////////////////////////////////////////////////////////////////////////////

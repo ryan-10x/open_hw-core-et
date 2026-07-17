@@ -23,7 +23,7 @@ module intpipe_top (
   input  logic                                  chicken_bit_intpipe,
   // Request to the front end
   output logic [`CORE_NR_THREADS-1:0]           id_fe_req_valid,
-  output                                        minion_fe_req [`CORE_NR_THREADS-1:0] id_fe_req,
+  output minion_fe_req [`CORE_NR_THREADS-1:0]   id_fe_req,
   output logic [`CORE_NR_THREADS-1:0]           id_fe_stall,
   // Front end response
   output logic                                  id_fe_resp_ready,
