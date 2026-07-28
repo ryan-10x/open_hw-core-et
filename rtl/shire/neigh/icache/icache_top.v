@@ -169,7 +169,7 @@ module icache_top #(
   icache_err_log_info_t                             esr_err_log_info_next;
 
 
-  // CLK    RST    EN                                           DOUT                     DIN                        DEF
+  //      CLK    RST    EN                                           DOUT                     DIN                        DEF
   `RST_FF(clock, reset,                                              f0_miss_state,           f0_miss_state_next,        icache_miss_state_Ready)
   `EN_FF (clock,        f1_miss | f1_hit,                            f0_paddr,                f1_paddr)
   `EN_FF (clock,        f1_hit,                                      f0_read_way,             f1_read_way)
@@ -375,7 +375,7 @@ module icache_top #(
   logic f0_l2_miss_req_valid_next;
   logic f0_l2_miss_req_acc;
 
-  // CLK    RST    DOUT                  DIN                        DEF
+  //       CLK    RST    DOUT                  DIN                        DEF
   `RST_FF (clock, reset, f0_l2_miss_req_valid, f0_l2_miss_req_valid_next, 1'b0)
 
   always_comb begin

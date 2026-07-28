@@ -663,6 +663,8 @@ module icache_micro_cache #(
                         // that "icache_miss_state_Ready" state it calcualtes the new state based on this "f2_miss" signal.
                         // Also, that during an outstanding MISS request the next would also marked as MISSED, without generating
                         // a miss request to L1 cache.
+                        // TODO: Here check that if the FSM state is Icache_miss_state_Ready or 
+                        // its state is Icache_miss_state_Fill_Wait and f0_l1_miss_resp_valid.
 
   // //////////////////////////////////////////////////////////////////////////////
   // LRU update

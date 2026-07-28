@@ -57,7 +57,7 @@ module icache_tag_array (
   logic [`ICACHE_SETS-1:0][`ICACHE_WAYS-1:0] f0_tag_valid, f0_tag_valid_next; // Valid cacheline entries in icache
   logic                                      f0_invalidated, f0_invalidated_next; // Tags have been invalidated
 
-  // CLK    RST    DOUT            DIN                DEF
+  //      CLK    RST    DOUT            DIN                DEF
   `RST_FF(clock, reset, f0_tag_valid,   f0_tag_valid_next, '0)
   `FF    (clock,        f0_invalidated, f0_invalidated_next)
 
@@ -162,7 +162,7 @@ module icache_tag_array (
   assign dbg_read_set  = apb_paddr[$clog2(`ICACHE_WAYS/2) +: `ICACHE_SET_ADDR_WIDTH]; // moving flop inside the tag array
   assign dbg_read_addr_en = apb_psel & ~apb_penable ;
 
-  // Read access`
+  // Read access
   always_comb begin
     dbg_read_en_next = dbg_read_en;
     if (apb_psel & ~apb_penable & ~apb_pwrite)
