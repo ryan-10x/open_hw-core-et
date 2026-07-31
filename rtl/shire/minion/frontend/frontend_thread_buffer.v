@@ -422,6 +422,9 @@ module frontend_thread_buffer #(
     f6_buffer_wr      = f6_req_valid && !f0_core_req_valid &&
         ((f6_icache_resp_valid && !f6_icache_resp_miss) || io_halt);
     f6_req_resp_valid = f6_req_valid && !f0_core_req_valid && ((f6_icache_resp_valid) || io_halt);
+    // TODO: If the "f6_req_valid" signal is ON, then it is sure that we receive the "f6_icache_resp_valid" 
+    // irrespective of the cache miss and hit.
+    // Assm: Maybe the "f6_icache_resp_valid is checking only for the combiantion with "io_halt"
 
     // Generates the enable
     for(integer i = 0; i < `FE_FETCH_BUFFERS; i++) begin
@@ -488,8 +491,8 @@ module frontend_thread_buffer #(
 ////////////////////////////////////////////////////////////////////////////////
   logic ffb_update_read_pointer;
 
-  //         CLK | RST |  EN                                                                                | REG           |  NEXT                                             | RST_VALUE
-  `RST_EN_FF(clock, reset, f6_valid && !f6_stall || &buffer_empty && f5_req_valid || ffb_update_read_pointer,  f6_buffer_ptr, (ffb_update_read_pointer) ? '0 : f6_buffer_ptr_next, '0)
+  //         CLK  | RST  | EN                                                                               | REG          | NEXT                                             | RST_VALUE
+  `RST_EN_FF(clock, reset, f6_valid && !f6_stall || &buffer_empty && f5_req_valid || ffb_update_read_pointer, f6_buffer_ptr, (ffb_update_read_pointer) ? '0 : f6_buffer_ptr_next, '0)
 
   assign ffb_update_read_pointer = debug_ffb_exec;
 

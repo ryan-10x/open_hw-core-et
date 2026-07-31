@@ -347,6 +347,9 @@ module frontend_top (
             inst_fifo_data[thread].intpipe_ctrl <= pending_data.intpipe_ctrl;
             if (pending_data_is_fp) inst_fifo_data[thread].vpu_ctrl_sigs <= pending_data.vpu_ctrl_sigs;
           end 
+          // TODO: For which cases the below block would get executed
+          // As this block is for when FiFo is full and we got inst_fifo_push request
+          // Although the inst_fifo_push first checks either the FiFo is completely filled or not
           if (inst_fifo_push[thread]) begin
             pending_data.core_resp <= f7_arb_inst_data;
             pending_data.intpipe_ctrl <= f7_intpipe_ctrl;
