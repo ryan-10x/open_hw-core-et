@@ -590,6 +590,7 @@ module frontend_thread_buffer #(
 
 
     f7_inst_data.replay       = !buffer_cacheable[f7_buffer_id] && f0_core_req.speculative; // Replay if not cacheable and speculative instruction
+    // TODO: Shouldn't we have to check the f0_core_req_valid signal before consuming the speculative signal
 
     if ( using_pfb ) begin
       f7_inst_data.page_fault0 = '0;

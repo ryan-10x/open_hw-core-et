@@ -386,10 +386,10 @@ module vpu_ctrl (
   // a TXFMA operation shows in the pipeline.
   ////////////////////////////////////////////////////////////////////////////////
 
-  //      CLK        RST    EN                              DOUT                 DIN                                                                           DEF
-  `EN_FF(clock_aon, id_core_inst_en, id_core_inst, id_core_inst_next)
-  `FF(clock_aon, id_inst_from_core, !(id_ml_inst_en_next | id_trans_insert_en_next))
-  `EN_FF(clock_aon, id_ml_inst_en_next, id_ml_mask, id_ml_mask_next)
+  //      CLK       EN                  DOUT               DIN
+  `EN_FF(clock_aon, id_core_inst_en,    id_core_inst,      id_core_inst_next)
+  `FF   (clock_aon,                     id_inst_from_core, !(id_ml_inst_en_next | id_trans_insert_en_next))
+  `EN_FF(clock_aon, id_ml_inst_en_next, id_ml_mask,        id_ml_mask_next)
 
 
 

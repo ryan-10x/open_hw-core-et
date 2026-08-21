@@ -112,11 +112,12 @@ module vpu_tensorreduce (
     // Computes next register pending
     if (is_reduce) begin
       reg_pending_next = reg_pending - 7'b1;
-      cur_reg_next     = cur_reg + 6'b1;
+      cur_reg_next     = cur_reg + 6'b1;  // TODO: Why adding 6'b1 when the total size of register is 5-bits
     end else begin
       // Decrement cols
       reg_pending_next[2:0] = reg_pending[2:0] - 3'b1;
-      cur_reg_next          = cur_reg + reduce_op + 6'b1;
+      cur_reg_next          = cur_reg + reduce_op + 6'b1; // TODO: Why adding 6'b1 when the total size of register is 5-bits
+                                                          //       Also, don't we need to first convert reduce_op to 5-bits??
 
       // Col done, move to next row
       if (reg_pending_next[2:0] == 3'b000) begin
@@ -144,6 +145,7 @@ module vpu_tensorreduce (
     end
 
     // Decrements count down unless a new exec op is sent
+    // TODO: What's the purpose of using this counter and why we choose the max count value to be FOUR??
     exec_op_cd_next = exec_op_cd - 3'b1;
     if (exec_op_cd == 3'b000)
       exec_op_cd_next = 3'b000;
@@ -228,16 +230,22 @@ module vpu_tensorreduce (
       reduce_inst_next[19:15] = cur_reg_next_mux; // Src2 is current reg
       reduce_inst_next[24:20] = cur_reg_next_mux; // Src2 is current reg
     end else if (exec_op_s0 && (reduce_op == 4'b1000)) begin
+      // TODO: Although for reduce_op == 8, the instruction_next signal remains LOW, but there's
+      // a question that why the RTL Engineer chooses the FCMOVM_PS (Conditional Move-Mask) instruction
+      // although there's no need for any conditional or masking check, while performing the move operation
       reduce_inst_next        = `FCMOVM_PS;
       reduce_inst_next[11:7]  = cur_reg_next_mux; // Destination is current reg
       reduce_inst_next[19:15] = cur_reg_next_mux; // Src2 is current reg
       reduce_inst_next[24:20] = cur_reg_next_mux; // Src2 is current reg
     end
+    // TODO: Why all the read and destination registers are same? How the next modules actually interprates them?
 
     // Need to write to current reg without doing broadcast for
     // receiver case
-    load_ctrl.wen           = exec_op;
+    load_ctrl.wen           = exec_op;  // TODO: What the above comment means?
     load_ctrl.thread_id     = 1'b0;    // Tensor reduce only supported at thread 0
+    // TODO: How the TensorBroadcast instruction would get handled? Mention the complete flow
+    // from the CSR write --> Dcache --> VPU receive and then storing them
     load_ctrl.broadcast_sel = 2'b00;
     load_ctrl.waddr         = cur_reg;
   end
@@ -259,3 +267,16 @@ module vpu_tensorreduce (
 
 endmodule
 
+// Questions
+// 1. The PRM states that whenever we are trying to send a Tensor from A to B, it would results 
+//    up stalling the execution of any instruction that would try to read the contents of vector register.
+//    In which module/SV file the stall condition is implemented?
+// 2. Validate the above stalling condition for
+//      a. TensorReduce    (Sender side: MHARTID % 2^(Height+2) = MHARTID % 2^(Height+1) )
+//      b. TensorBroadcast (Sender side: MHARTID % 2^(Height+2) = 0 )
+// 3. The RTL should not stalled the pipeline if we execute the TensorStoreFromScp instruction because the contents of the
+//    tensor are stored in the L1 Data cache Scratchpad. Confirm this non-stalling behaviour.
+// 4. Find out the purpose of "exec_op_cd" register with the explanation of its chosen width and max value 4.
+//    Also mention the need to flop the input "dcache_reduce_ctrl.exec_op" one more time after flopping in 
+//    "exec_op_s0" register and use it with "exec_op_cd" register.
+// 5. "load_ctrl.broadcast_sel" serves what purpose?
