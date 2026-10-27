@@ -1,0 +1,93 @@
+# Copyright (c) 2026 Ainekko
+# SPDX-License-Identifier: Apache-2.0
+#
+# L0 micro-cache 2 MB superpage alias testbench, Cadence Xcelium flow.
+# Same sources as the Verilator Makefile in this folder.
+#
+#   make -f Makefile.xcelium            compile, elaborate and run in batch
+#   make -f Makefile.xcelium run_gui    same, in SimVision, waiting at time 0
+#   make -f Makefile.xcelium waves      open waves.shm of the last run in SimVision
+#   make -f Makefile.xcelium comp       compile only, a quick syntax check
+#   make -f Makefile.xcelium elab       compile and elaborate, no simulation
+#   make -f Makefile.xcelium clean
+#
+# Waves: probes.tcl writes waves.shm for SimVision. run_gui and waves load
+# icache_l0_superpage_alias_tb.svcf, the grouped signal list (the SimVision
+# counterpart of the .gtkw file). icache_l0_superpage_alias_dump also writes
+# icache_l0_superpage_alias_tb.vcd, so "make wave" (GTKWave) works on the
+# output of an Xcelium run too.
+
+REPOROOT ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../..)
+RTLROOT  ?= $(REPOROOT)/rtl
+export REPOROOT RTLROOT
+
+TB       := icache_l0_superpage_alias_tb
+DUMP_TOP := icache_l0_superpage_alias_dump
+TEST_DIR := $(REPOROOT)/dv/standalone/icache_l0_superpage_alias
+LOGDIR   := logs
+WAVES    := waves.shm
+SVCF     := $(TEST_DIR)/$(TB).svcf
+
+# The neigh filelists nest, and several of them include libs_rtl.f. xmvlog
+# stops with *F,REARGF on a repeated -f, so they are flattened into one list
+# with every entry kept once. The list is rebuilt on every run.
+TOP_FLISTS := $(RTLROOT)/shire/neigh/neigh_top_rtl.f \
+              $(RTLROOT)/shire/neigh/neigh_top_vcs_defines.f \
+              $(RTLROOT)/shire/neigh/neigh_channel_hm_behav.f
+FLAT_FLIST := $(LOGDIR)/flat_rtl.f
+
+# shire_channel/icache is not in the filelists; the Verilator flow adds it with
+# -y as well, for the I-cache data RAM wrapper
+LIBDIRS  := -y $(RTLROOT)/shire/shire_channel/icache
+INCDIRS  := +incdir+$(RTLROOT)/inc +incdir+$(REPOROOT)
+LIBEXT   := +libext+.v+.sv
+
+# xmvlog 23.03 cannot parse some of the shared RTL headers as written: nested
+# `MAX widths in debug_defines.vh and maxshire_defines.vh, and the type(expr)
+# operator in the LATCH and LATCH_P2 macros. MACRO_FIX is compiled first. It
+# pulls in soc_defines.vh and redefines those macros in a form xmvlog accepts,
+# leaving rtl/inc untouched. See the file header for the details.
+MACRO_FIX := $(TEST_DIR)/xcelium_macro_fix.svh
+
+TB_SRCS  := $(MACRO_FIX) $(TEST_DIR)/$(TB).sv $(TEST_DIR)/$(DUMP_TOP).sv
+TOPS     := -top $(TB) -top $(DUMP_TOP)
+
+# NORECI: cpu_clint_types.vh includes soc.vh again from inside soc.vh. The
+# include guard stops it there, so the recursion warning is noise.
+NOWARN   := -nowarn NORECI
+
+RUN_BASE  = xrun -clean -sv -64bit $(NOWARN) -f $(FLAT_FLIST) $(LIBDIRS) \
+            $(INCDIRS) $(LIBEXT) -timescale 1ns/1ps $(DEFINES) \
+            $(TB_SRCS) $(TOPS) -access +rwc \
+            -input $(TEST_DIR)/probes.tcl \
+            -l $(LOGDIR)/$(TB).log
+
+.PHONY: all run run_gui waves comp elab clean FORCE
+all: run
+
+FORCE:
+
+$(FLAT_FLIST): FORCE
+	mkdir -p $(LOGDIR)
+	$(TEST_DIR)/flatten_flist.sh $(TOP_FLISTS) > $@
+
+# Compile only. xmvlog cannot resolve the -y library directories in the
+# filelist, so the split steps also go through xrun.
+comp: $(FLAT_FLIST)
+	$(RUN_BASE) -compile
+
+elab: $(FLAT_FLIST)
+	$(RUN_BASE) -elaborate
+
+run: $(FLAT_FLIST)
+	$(RUN_BASE) -run -exit
+
+run_gui: $(FLAT_FLIST)
+	$(RUN_BASE) -gui -simvisargs "-input $(SVCF)"
+
+waves:
+	simvision -64bit $(WAVES) -input $(SVCF)
+
+clean:
+	rm -rf xcelium.d xmvlog* xmelab* simvision* xrun.history xrun.key \
+	       .simvision worklib INCA_libs $(LOGDIR) $(WAVES) xrun.log

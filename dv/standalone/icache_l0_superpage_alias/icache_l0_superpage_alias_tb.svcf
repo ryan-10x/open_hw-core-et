@@ -1,0 +1,209 @@
+# Copyright (c) 2026 Ainekko
+# SPDX-License-Identifier: Apache-2.0
+#
+# SimVision command file for icache_l0_superpage_alias_tb.
+#
+# Groups follow icache_l0_superpage_alias_tb.gtkw, with the translation path
+# split out so each request and its response can be timed: TLB lookup (F1),
+# TLB fill, icache -> PTW request, PTW -> icache response, the walker itself,
+# and its page-table reads. "L0 tag array" shows the tag compare that decides
+# step 4.
+#
+# Loaded by Makefile.xcelium:
+#   make -f Makefile.xcelium run_gui   live simulation
+#   make -f Makefile.xcelium waves     saved waves.shm
+#
+# By hand: simvision waves.shm -input icache_l0_superpage_alias_tb.svcf
+# The same file works in both modes: signals are taken from the live
+# simulator when there is one, otherwise from the waves database.
+
+set sp_db waves
+if {[lsearch -exact [database find] simulator] >= 0} {
+  set sp_db simulator
+}
+
+set sp_tb  icache_l0_superpage_alias_tb
+set sp_uc  $sp_tb.dut.icache.UCACHE\[0\].micro_cache
+set sp_tlb $sp_uc.tlb_array.tlb_top
+set sp_ptw $sp_tb.ptw0.ptw
+
+window new WaveWindow -name {icache_l0_superpage_alias_tb}
+waveform using {icache_l0_superpage_alias_tb}
+
+# Adds one group to the waveform window. sigs is a flat list of
+# {path radix} pairs. In a path, @tb is the testbench, @uc the requestor 0
+# micro-cache, @tlb its TLB and @ptw the PTW 0 walker. A radix of "-" keeps
+# the SimVision default, which shows enum names for the FSM states.
+proc sp_group {name sigs {collapsed 0}} {
+  global sp_db sp_tb sp_uc sp_tlb sp_ptw
+  set map [list @tlb $sp_tlb @ptw $sp_ptw @uc $sp_uc @tb $sp_tb]
+
+  catch {group delete [list $name]}
+  group new -name $name -overlay 0
+  group using $name
+  group set -overlay 0
+  group clear 0 end
+  foreach {sig radix} $sigs {
+    group insert "${sp_db}::[string map $map $sig]"
+  }
+
+  set gid [waveform add -groups [list $name]]
+  foreach item [waveform hierarchy contents $gid] {sig radix} $sigs {
+    if {$radix ne "-"} {waveform format $item -radix $radix}
+  }
+  if {$collapsed} {waveform hierarchy collapse $gid}
+}
+
+sp_group {Testbench} {
+  @tb.clock                                  -
+  @tb.reset                                  -
+  @tb.cyc                                    %d
+  @tb.tb_step                                %d
+  @tb.tb_expected_pa                         %x
+}
+
+sp_group {Step 0: invalidate and flush} {
+  @tb.tlb_invalidate                         %b
+  @tb.f0_flush_data                          %b
+  @tb.satp_info[0]                           %x
+}
+
+sp_group {Minion 0 request} {
+  @tb.f0_req_valid                           %b
+  @tb.f0_req_ready                           %b
+  @tb.f0_req[0].thread_id                    -
+  @tb.f0_req[0].addr                         %x
+}
+
+# F1 lookup: req_valid is f1_valid, the answer is combinational in the same
+# cycle (f1_tlb_resp_data) and is flopped into F2 as f2_tlb_resp_data
+sp_group {TLB request (F1, requestor 0)} {
+  @uc.f1_valid                               -
+  @uc.f1_min_id                              %d
+  @uc.f1_tlb_req_data.vpn                    %x
+  @tlb.req_tag                               %x
+  @tlb.tlb_cache_raddr                       %x
+}
+
+sp_group {TLB response (F1)} {
+  @uc.f1_tlb_resp_data.miss                  -
+  @uc.f1_tlb_resp_data.fill_pending          -
+  @uc.f1_tlb_resp_data.ppn                   %x
+  @uc.f1_tlb_resp_data.xcpt_if               -
+  @uc.f1_tlb_resp_data.access_fault          -
+  @tlb.tlb_cache_hit                         -
+  @tlb.tlb_cache_rtag                        %x
+  @tlb.tlb_miss                              -
+  @tlb.state                                 -
+  @uc.f2_tlb_fill_done                       -
+}
+
+sp_group {TLB fill} {
+  @tlb.ptw_resp_valid_reg                    -
+  @tlb.pte_is_leaf                           -
+  @tlb.rf_latch_wr_en                        -
+  @tlb.tlb_cache_waddr                       %x
+  @tlb.tlb_cache_wdata                       %x
+  @tlb.tlb_cache_valid                       %b
+}
+
+# Bit 0 of the ptw_* vectors is requestor 0 (Minions 0-3); requestor 1 is idle
+sp_group {PTW request (icache -> PTW 0)} {
+  @tb.ptw_req_valid                          %b
+  @tb.ptw_req_ready                          %b
+  @tb.ptw_req_data[0].addr                   %x
+  @tb.ptw_req_data[0].satp_ppn               %x
+  @tb.ptw_req_data[0].satp_mode              %d
+  @tb.ptw_req_data[0].prv                    %d
+  @tb.ptw_invalidate                         %b
+}
+
+sp_group {PTW response (PTW 0 -> icache)} {
+  @tb.ptw_resp_valid                         %b
+  @tb.ptw0_resp_data.ppn                     %x
+  @tb.ptw0_resp_data.v                       -
+  @tb.ptw0_resp_data.r                       -
+  @tb.ptw0_resp_data.x                       -
+  @tb.ptw0_resp_data.a                       -
+  @tb.ptw0_resp_data.d                       -
+  @tb.ptw0_resp_data.access_fault            -
+}
+
+sp_group {Page-table walker (PTW 0)} {
+  @ptw.state                                 -
+  @ptw.level_count                           %d
+  @ptw.req_data_reg.addr                     %x
+  @ptw.pte_addr                              %x
+  @ptw.current_pte_reg.ppn                   %x
+  @ptw.pte_cache_hit                         -
+  @ptw.l1_hit                                -
+}
+
+sp_group {Page-table memory reads} {
+  @tb.pt_req_valid                           -
+  @tb.pt_req.address                         %x
+  @tb.pt_rsp_valid                           -
+  @tb.pt_reads                               %d
+}
+
+sp_group {Micro-cache F2 (requestor 0)} {
+  @uc.f2_valid                               -
+  @uc.f2_req.thread_id                       -
+  @uc.f2_req.addr                            %x
+  @uc.f2_tlb_resp_data.miss                  -
+  @uc.f2_tlb_resp_data.ppn                   %x
+  @uc.f2_paddr                               %x
+  @uc.f2_hit                                 -
+  @uc.f2_miss                                -
+}
+
+sp_group {L0 tag array} {
+  @uc.f2_tag                                 %x
+  @uc.f2_hit_array                           %b
+  @uc.f2_valid_hit_array                     %b
+  @uc.f2_victim                              %b
+  @uc.f0_tag_array_wr_valid                  -
+  @uc.f0_tag_array_wr_tag                    %x
+}
+
+# f0_miss_addr and f0_miss_victim are captured from f2_paddr and f2_victim
+# on f2_miss; f0_miss_addr is what goes out as f0_l1_miss_req_addr
+sp_group {L0 miss handler} {
+  @uc.f0_miss_state                          -
+  @uc.f0_miss_addr                           %x
+  @uc.f0_miss_victim                         %b
+}
+
+# Micro-cache side of the L0 <-> L1 interface, then the icache_top side
+# (after the requestor arbiter) and the L1 tag lookup
+sp_group {L1 request / response (requestor 0)} {
+  @uc.f0_l1_miss_req_valid                   -
+  @uc.f0_l1_miss_req_ready                   -
+  @uc.f0_l1_miss_req_addr                    %x
+  @uc.f0_l1_miss_resp_early_valid            -
+  @uc.f0_l1_miss_resp_valid                  -
+  @uc.f0_l1_miss_resp_data                   %x
+  @uc.f0_l1_miss_resp_ecc_err                -
+  @uc.f0_l1_miss_resp_l2_err                 -
+  @tb.dut.icache.f0_l1_miss_req_valid        -
+  @tb.dut.icache.f0_l1_miss_req_ready        -
+  @tb.dut.icache.f0_l1_miss_req_addr         %x
+  @tb.dut.icache.f0_l1_miss_req_idx          %d
+  @tb.dut.icache.f1_hit                      -
+  @tb.dut.icache.f1_miss                     -
+  @tb.dut.icache.f0_miss_state               -
+  @tb.dut.icache.f0_l1_miss_resp_valid       -
+}
+
+sp_group {Response to Minion 0} {
+  @tb.f4_resp_valid                          %b
+  @tb.f4_resp_miss                           %b
+  @tb.f4_resp[0].data                        %x
+  @tb.f5_resp_fill_done                      %b
+}
+
+sp_group {L2 code reads} {
+  @tb.l2_req_valid                           -
+  @tb.l2_req.address                         %x
+  @tb.l2_rsp_valid                           -
+}

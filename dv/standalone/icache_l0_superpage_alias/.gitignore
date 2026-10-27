@@ -1,0 +1,18 @@
+# Verilator
+obj_dir
+build.log
+simv.log
+*.vcd
+# Xcelium
+logs
+waves.shm
+xcelium.d
+xmvlog*
+xmelab*
+xrun.history
+xrun.key
+xrun.log
+simvision*
+.simvision
+worklib
+INCA_libs
