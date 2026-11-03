@@ -302,6 +302,11 @@ module intpipe_top (
     // Instruction can't move forward
     // We are in fence mode and it is a memory instruction or a CSR access (ex: TensorFMA wants TensorLoad to be done)
     id_do_fence = id_dcache_busy[id_thread_id] && id_reg_fence[id_thread_id] && (id_ctrl.mem || id_csr_en || id_ctrl.fence) && !id_xcpt_ignore_opcode;
+    // TODO: This "id_do_fence" signal may trigger the id stall which in turn lower down the id_inst_ready signal to FE.
+    //       The question is if a fence instruction is executing and the next instruction contains some fault do the RISC-V allows to handle that
+    //       exception in next instr. without completing the current fence.
+    //       Also, it would only stop the instruction if it isn't of memory OR fence OR CSR. Why there is a need for stoping of CSR instr?
+    //       And it may accepts fault on far next insturction during the completion of previous FENCE. Do RISC-V allows this?
   end
 
    // Stalls for exclusive mode
@@ -312,11 +317,15 @@ module intpipe_top (
    logic           ex_csr_excl_mode;         // EX has a CSR write to excl mode => used to prevent gsc of the other thread in ID
    logic           tag_csr_excl_mode;        // TAG has a CSR write to excl mode => used to prevent gsc of the other thread in ID
    logic           mem_csr_excl_mode;        // MEM has a CSR write to excl mode => used to prevent gsc of the other thread in ID
+   // TODO: Here how we are validating that we have to prevent GSC of the other thread, because there is no logic here for comparing the THREAD_ID.
    
    `RST_FF(clock, reset_w, csr_excl_mode_stall_dcache, csr_excl_mode_stall_dcache_next, 1'b0)
    always_comb begin
       csr_excl_mode_stall_dcache_next = csr_excl_mode_transition ? 1'b1: 
                                       csr_excl_mode_stall_dcache ? !id_dcache_idle : csr_excl_mode_stall_dcache;
+      // TODO: Here we stall the Dcache everytime we were transitioning to/from (verify this to/from behavior) exclusive mode.
+      //       What would happen if there is already a Dcache operation pending like GS/SC operation?
+      //       If the younger instruction is exclusive mode, then do we stall the Dcache and transition to exclusive mode?
       
       csr_excl_mode_stall = csr_excl_mode_stall_dcache ||                      // waiting for the dcache not to be busy
                             id_ctrl.gsc && (                                   // do not launch a gsc if about to enter excl mode
@@ -324,6 +333,8 @@ module intpipe_top (
                                      tag_csr_excl_mode && tag_reg_valid  ||
                                      mem_csr_excl_mode && mem_reg_valid) || 
                             csr_excl_mode_transition;                          // about to enter or exit excl mode
+      // TODO: Here in above line, why we are stalling explicity the GSC instruction?
+      //       Also, why there isn't a wb csr_excl_mode check? Would we enter in this state before the writeback stage?
    end
    
    ////////////////////////////////////////////////////////////////////////////////
@@ -401,6 +412,9 @@ module intpipe_top (
       // data coming from dcache
       else if(!id_raddr_zero[i] && (wb_dcache_resp.dest.thread_id == id_thread_id) && ( wb_dcache_wen) && (wb_dcache_resp.dest.addr == id_raddr[i]))
         id_reg_data[i] = wb_dcache_resp.data[`XREG_RANGE];
+      // TODO: Upon giving a load request to Dcache, do we stall the pipeline untill we get a response for that register or we use the scoreboard for 
+      //       tracking it and stall on a RAW hazard. Explain this is detail how the pipeline is handling RAW hazards.
+      //       Also, explain the above line too, with some reasonable points.
       // Data coming from WB stage alu
       else if(!id_raddr_zero[i] && (wb_thread_id == id_thread_id) && wb_wen && (wb_waddr == id_raddr[i]))
         id_reg_data[i] = wb_reg_wdata;
@@ -429,6 +443,8 @@ module intpipe_top (
    
 
    assign id_keepgsc = ex_gscing && !ex_ctrl_kill && id_dcache_ready;
+   // TODO: What would happen if the id_dcache_ready signal is OFF, or during GSC stage it gets LOW?
+   //        Then do the instruction in ID stage moves to next stage?
    assign ex_gsc_busy = (ex_gscing || gsc_reg_gscing) && !ex_ctrl_kill;
 
    assign id_reg_gsc_cnt_tid = gsc_progress;
@@ -707,6 +723,7 @@ module intpipe_top (
         id_csr_en          = (id_ctrl.csr != core_csr_ctrl_N);
         id_system_insn     = (id_ctrl.csr == core_csr_ctrl_I);
         id_csr_ren         = ((id_ctrl.csr == core_csr_ctrl_S) || (id_ctrl.csr == core_csr_ctrl_C)) && (id_raddr1 == 5'b0);
+        // TODO: Can't we read using the CSSRW instruction?
         id_csr             = id_csr_ren ? core_csr_ctrl_R : id_ctrl.csr;
         id_csr_addr        = csr_ad_t'(id_inst_bits[31:20]);
         id_csr_fflags      = id_csr_addr == csr_ad_FCSR || id_csr_addr == csr_ad_FFLAGS;
@@ -740,6 +757,11 @@ module intpipe_top (
         // List of CSR writes that modify VPU RF and have to stall following
         // instructions in case they read VPU registers
         id_csr_vpu      = id_csr_en && !id_csr_ren && ((id_csr_addr == csr_ad_TENSOR_REDUCE) || (id_csr_addr == csr_ad_TENSOR_FMA) || (id_csr_addr == csr_ad_TENSOR_QUANT) || (id_csr_addr == csr_ad_TENSOR_STORE));
+        // TODO: Here why we haven't compare the "csr_ad_TENSOR_LOAD"?
+        //       Also, the Tensor Store didn't change the VPU RF, it only stores the RF value to Cache, so we we compare it in above?
+        // Understanding: I think the comment above the line didn't means to change to VPU RF, it says that for which instructions we need to read the VPU RF and changing them
+        //                would add some issue.
+        // Comments: No, I believe that the above understanding may be wrong. Further reading, would clarify it more.
         id_csr_vpu_qual = id_valid_qual && id_csr_vpu;
 
         // detect future write to exclusive mode => prevent gsc in other threads
@@ -753,8 +775,10 @@ module intpipe_top (
                              wb_reg_valid && wb_thread_id == id_thread_id && wb_csr_flush;
 
         id_uses_alu = (!id_ctrl.alu_fn[4] || id_xcpt_pf || id_xcpt_af || id_bp_xcpt) && id_valid_qual; // if MSB of alu_dw either the mul/div is used, or nothing at all
+        // TODO: In which cases we wouldn't use the ALU? Also, why we are using the ALU for PF, AF and specifically BP? Is it to move to some Trap Handler address?
         id_uses_rs1_all = id_valid_qual && id_ctrl.div;
         id_uses_rs1_lsb = id_valid_qual && ((id_ctrl.mem && dcache_cmd_is_gsc32(id_ctrl.mem_cmd)) || id_ctrl.div);
+        // TODO: What does above line means?
         id_uses_rs2 = id_valid_qual && (id_ctrl.div  || id_ctrl.mem && id_ctrl.rxs2);
      end
 
@@ -831,6 +855,8 @@ module intpipe_top (
     id_illegal_insn = !id_ctrl.legal ||
         id_ctrl.fp && !status[id_thread_id].fs || // if mstatus.fs=OFF, illegal ins if attempting to use fp
         id_ctrl.gfx && esr_features.trap_on_gfx;      // gfx instruction not allowed
+    // TODO: Are there other possibilites or combinations for an illegal instruction?
+    //       Accessing M-mode CSRs in U-mode privilege levels raises an illegal instrcution exception?
 
     // Prioritizes the exceptions
     // By default we set the lowest prio exception case
@@ -857,6 +883,7 @@ module intpipe_top (
       id_xcpt_cause = core_xcpt_cause_MCODE_INSTRUCTION;
     else
       id_xcpt = 1'b0;
+    // TODO: On page 13 of IntPipe u-arch, it says that the highest priority is for Halt Req, where is it?
   end
   
    
@@ -914,6 +941,8 @@ module intpipe_top (
     id_cannot_bypass_ex = ex_csr_en ||                     // CSR instructions
         ex_ctrl.jalr || ex_ctrl.mem ||   // JALR and MEM
         ex_ctrl.div || ex_ctrl.fp;       // DIV and FP
+    // TODO: Here shouldn't we have to check that csr_en and it is not of read?
+    //       Also, why we are checking the div and fp instruction without first validating the Structural Hazards?
 
     // Checks if there's an integer hazard issue
     id_int_data_hazard_ex = 1'b0;
